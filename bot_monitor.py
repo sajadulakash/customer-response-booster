@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 AUTOHOTKEY_SCRIPT_PATH = os.getenv("AUTOHOTKEY_SCRIPT_PATH", str(Path(__file__).parent / "CallAutomation.ahk"))
 TEXT_TO_MONITOR = "Folder is empty"
-TIMEOUT_SECONDS = 60
+TIMEOUT_SECONDS = 35  # 35 seconds
 
 # Global variables
 selected_zone = None
@@ -58,8 +58,8 @@ class ScreenZoneSelector:
         # Store original dimensions for coordinate mapping
         self.orig_height, self.orig_width = self.frame.shape[:2]
         
-        # Scale to 640 width while maintaining aspect ratio
-        self.scale_width = 640
+        # Scale to 1080 width while maintaining aspect ratio
+        self.scale_width = 1080
         self.scale_ratio = self.scale_width / self.orig_width
         self.scale_height = int(self.orig_height * self.scale_ratio)
         
@@ -80,6 +80,9 @@ class ScreenZoneSelector:
         
         tk.Label(button_frame, text="Click and drag to select zone, then press 'Next'", 
                 font=("Arial", 10, "bold")).pack(side=tk.LEFT)
+        
+        tk.Button(button_frame, text="Reload SS", command=self.reload_screenshot, 
+                 bg="blue", fg="white", font=("Arial", 10, "bold")).pack(side=tk.RIGHT, padx=5)
         
         tk.Button(button_frame, text="Next", command=self.select_zone, 
                  bg="green", fg="white", font=("Arial", 10, "bold")).pack(side=tk.RIGHT, padx=5)
@@ -126,6 +129,31 @@ class ScreenZoneSelector:
         selected_zone = (x1, y1, x2, y2)
         logger.info(f"✅ Zone selected (scaled): ({min(self.start_x, event.x)}, {min(self.start_y, event.y)}, {max(self.start_x, event.x)}, {max(self.start_y, event.y)})")
         logger.info(f"✅ Zone selected (original coords): {selected_zone}")
+    
+    def reload_screenshot(self):
+        """Reload screenshot with current PC screen"""
+        # Capture new screenshot
+        self.screenshot = self.sct.grab(self.monitor)
+        self.frame = np.array(self.screenshot)
+        self.frame = cv2.cvtColor(self.frame, cv2.COLOR_BGRA2RGB)
+        
+        # Update original dimensions
+        self.orig_height, self.orig_width = self.frame.shape[:2]
+        
+        # Recalculate scale
+        self.scale_ratio = self.scale_width / self.orig_width
+        self.scale_height = int(self.orig_height * self.scale_ratio)
+        
+        # Resize frame for display
+        self.frame_resized = cv2.resize(self.frame, (self.scale_width, self.scale_height))
+        
+        # Update window size
+        self.root.geometry(f"{self.scale_width}x{self.scale_height + 80}")
+        
+        # Clear canvas and redraw
+        self.canvas.config(width=self.scale_width, height=self.scale_height)
+        self.display_screen()
+        logger.info("🔄 Screenshot reloaded")
     
     def select_zone(self):
         if not selected_zone:
